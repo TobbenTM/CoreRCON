@@ -56,7 +56,7 @@ namespace CoreRCON
 		/// Connect to a server through RCON.  Automatically sends the authentication packet.
 		/// </summary>
 		/// <returns>Awaitable which will complete when a successful connection is made and authentication is successful.</returns>
-		public async Task ConnectAsync()
+		internal async Task ConnectAsync()
 		{
 			_tcp = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 			await _tcp.ConnectAsync(_endpoint);
@@ -74,8 +74,6 @@ namespace CoreRCON
 			_authenticationTask = new TaskCompletionSource<bool>();
 			await SendPacketAsync(new RCONPacket(0, PacketType.Auth, _password));
 			await _authenticationTask.Task;
-
-			Task.Run(() => WatchForDisconnection(_reconnectDelay)).Forget();
 		}
 
 		public void Dispose()
@@ -175,32 +173,6 @@ namespace CoreRCON
 			// Continue listening
 			if (!_connected) return;
 			_tcp.ReceiveAsync(e);
-		}
-
-		/// <summary>
-		/// Polls the server to check if RCON is still authenticated.  Will still throw if the password was changed elsewhere.
-		/// </summary>
-		/// <param name="delay">Time in milliseconds to wait between polls.</param>
-		private async void WatchForDisconnection(uint delay)
-		{
-			int checkedDelay = checked((int)delay);
-
-			while (true)
-			{
-				try
-				{
-					Identifier = Guid.NewGuid().ToString().Substring(0, 5);
-					await SendCommandAsync(Constants.CHECK_STR + Identifier);
-				}
-				catch (Exception ex)
-				{
-					Dispose();
-					OnDisconnected();
-					return;
-				}
-
-				await Task.Delay(checkedDelay);
-			}
 		}
 	}
 }
